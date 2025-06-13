@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM & NER Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .entity-highlight {
+            background-color: #fef3c7;
+            padding: 2px 4px;
+            border-radius: 4px;
+            margin: 0 2px;
+        }
+        .loading {
+            display: none;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">LLM & NER Analysis</h1>
+        
+        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
+            <div class="mb-4">
+                <label for="prompt-input" class="block text-sm font-medium text-gray-700 mb-2">Enter your prompt:</label>
+                <textarea
+                    id="prompt-input"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows="4"
+                    placeholder="Type your prompt here..."
+                ></textarea>
+            </div>
+            
+            <button
+                id="send-btn"
+                class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center"
+            >
+                <span id="button-text">Analyze</span>
+                <svg id="loading-spinner" class="loading w-5 h-5 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+
+            <div class="mt-6 space-y-4">
+                <div id="entities" class="p-4 bg-gray-50 rounded-md">
+                    <h2 class="text-lg font-semibold mb-2 text-gray-700">Named Entities:</h2>
+                    <div id="entities-content" class="text-gray-600"></div>
+                </div>
+
+                <div id="llm-response" class="p-4 bg-gray-50 rounded-md">
+                    <h2 class="text-lg font-semibold mb-2 text-gray-700">LLM Response:</h2>
+                    <div id="response-content" class="text-gray-600"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const button = document.getElementById('send-btn');
+        const buttonText = document.getElementById('button-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const promptInput = document.getElementById('prompt-input');
+        const entitiesContent = document.getElementById('entities-content');
+        const responseContent = document.getElementById('response-content');
+
+        function setLoading(isLoading) {
+            button.disabled = isLoading;
+            buttonText.textContent = isLoading ? 'Analyzing...' : 'Analyze';
+            loadingSpinner.style.display = isLoading ? 'block' : 'none';
+        }
+
+        function highlightEntities(text, entities) {
+            let result = text;
+            entities.forEach(([entity, label]) => {
+                const regex = new RegExp(entity, 'g');
+                result = result.replace(regex, 
+                    `<span class="entity-highlight" title="${label}">${entity}</span>`
+                );
+            });
+            return result;
+        }
+
+        button.addEventListener('click', async () => {
+            const prompt = promptInput.value.trim();
+            if (!prompt) return;
+
+            setLoading(true);
+            entitiesContent.innerHTML = '';
+            responseContent.innerHTML = '';
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+
+                const data = await response.json();
+                
+                // Display entities
+                const entitiesHtml = data.entities.length > 0
+                    ? data.entities.map(([text, label]) => 
+                        `<span class="entity-highlight" title="${label}">${text}</span>`
+                    ).join(', ')
+                    : 'No entities found';
+                entitiesContent.innerHTML = entitiesHtml;
+
+                // Display LLM response with highlighted entities
+                responseContent.innerHTML = highlightEntities(data.response, data.entities);
+            } catch (error) {
+                console.error('Error:', error);
+                responseContent.innerHTML = 'Error: Could not process your request.';
+            } finally {
+                setLoading(false);
+            }
+        });
+    </script>
+</body>
+</html> 
